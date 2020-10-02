@@ -23,8 +23,8 @@
  */
 package com.github.simplenet;
 
-import com.github.pbbl.AbstractBufferPool;
-import com.github.pbbl.direct.DirectByteBufferPool;
+import com.github.antideveloppeur.pbbl.AbstractBufferPool;
+import com.github.antideveloppeur.pbbl.direct.DirectByteBufferPool;
 import com.github.simplenet.packet.Packet;
 import com.github.simplenet.utility.IntPair;
 import com.github.simplenet.utility.MutableBoolean;
@@ -97,11 +97,11 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
                 return;
             }
 
-            var client = pair.getKey();
-            var buffer = pair.getValue().flip();
+            Client client = pair.getKey();
+            ByteBuffer buffer = (ByteBuffer) pair.getValue().flip();
 
             synchronized (client.queue) {
-                var queue = client.queue;
+                Deque<IntPair<Predicate<ByteBuffer>>> queue = client.queue;
 
                 IntPair<Predicate<ByteBuffer>> peek;
 
@@ -110,7 +110,7 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
                     return;
                 }
 
-                var stack = client.stack;
+                Deque<IntPair<Predicate<ByteBuffer>>> stack = client.stack;
 
                 boolean shouldDecrypt = client.decryptionCipher != null;
                 boolean queueIsEmpty = false;
@@ -120,11 +120,11 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
                 client.inCallback.set(true);
 
                 while (buffer.remaining() >= (key = peek.getKey())) {
-                    var wrappedBuffer = buffer.duplicate().mark().limit(buffer.position() + key);
+                    ByteBuffer wrappedBuffer = (ByteBuffer) buffer.duplicate().mark().limit(buffer.position() + key);
 
                     if (shouldDecrypt) {
                         try {
-                            wrappedBuffer = client.decryptionFunction.apply(client.decryptionCipher, wrappedBuffer)
+                            wrappedBuffer = (ByteBuffer) client.decryptionFunction.apply(client.decryptionCipher, wrappedBuffer)
                                     .reset();
                         } catch (Exception e) {
                             throw new IllegalStateException("An exception occurred whilst encrypting data:", e);
@@ -139,7 +139,7 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
                     if (wrappedBuffer.hasRemaining()) {
                         int remaining = wrappedBuffer.remaining();
                         byte[] decodedData = new byte[Math.min(key, 8)];
-                        wrappedBuffer.reset().get(decodedData);
+                        ((ByteBuffer) wrappedBuffer.reset()).get(decodedData);
                         LOGGER.warn("A packet has not been read fully! {} byte(s) leftover! First 8 bytes of data: {}",
                                 remaining, decodedData);
                     }
@@ -161,7 +161,7 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
                 // If the queue is not empty and there exists remaining data in the buffer, then that means
                 // that we haven't received all of the requested data, and must re-use the same buffer.
                 if (!queueIsEmpty && buffer.hasRemaining()) {
-                    client.channel.read(buffer.position(buffer.limit()).limit(key), pair, this);
+                    client.channel.read((ByteBuffer) buffer.position(buffer.limit()).limit(key), pair, this);
                 } else {
                     // The buffer that was used must be returned to the pool.
                     DIRECT_BUFFER_POOL.give(buffer);
@@ -173,7 +173,7 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
                     } else {
                         // Because the queue is NOT empty and we don't have enough data to process the request,
                         // we must read more data.
-                        var newBuffer = DIRECT_BUFFER_POOL.take(peek.getKey());
+                        ByteBuffer newBuffer = DIRECT_BUFFER_POOL.take(peek.getKey());
                         client.channel.read(newBuffer, new Pair<>(client, newBuffer), this);
                     }
                 }
@@ -190,7 +190,7 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
      * The {@link CompletionHandler} used when this {@link Client} sends one or more {@link Packet}s to a
      * {@link Server}.
      */
-    private final CompletionHandler<Integer, ByteBuffer> packetHandler = new CompletionHandler<>() {
+    private final CompletionHandler<Integer, ByteBuffer> packetHandler = new CompletionHandler<Integer, ByteBuffer>() {
         @Override
         public void completed(Integer result, ByteBuffer buffer) {
             Client client = Client.this;
@@ -456,14 +456,22 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
             flush();
 
             while (writeInProgress.get()) {
-                Thread.onSpinWait();
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
         }
 
         Channeled.super.close();
 
         while (channel.isOpen()) {
-            Thread.onSpinWait();
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
         postDisconnectListeners.forEach(Runnable::run);
@@ -524,7 +532,7 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
             n = Utility.roundUpToNextMultiple(n, blockSize == 0 ? decryptionCipher.getOutputSize(n) : blockSize);
         }
 
-        var pair = new IntPair<Predicate<ByteBuffer>>(n, buffer -> predicate.test(buffer.order(order)));
+        IntPair<Predicate<ByteBuffer>> pair = new IntPair<>(n, buffer -> predicate.test(buffer.order(order)));
 
         synchronized (queue) {
             if (inCallback.get()) {
@@ -535,7 +543,7 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
             queue.offerFirst(pair);
 
             if (!readInProgress.getAndSet(true)) {
-                var buffer = DIRECT_BUFFER_POOL.take(n);
+                ByteBuffer buffer = DIRECT_BUFFER_POOL.take(n);
                 channel.read(buffer, new Pair<>(this, buffer), Listener.INSTANCE);
             }
         }
@@ -559,13 +567,13 @@ public class Client extends AbstractReceiver<Runnable> implements Channeled<Asyn
 
                 ByteBuffer raw = DIRECT_BUFFER_POOL.take(packet.getSize(this));
 
-                for (var input : queue) {
+                for (Consumer<ByteBuffer> input : queue) {
                     input.accept(raw);
                 }
 
                 if (shouldEncrypt) {
                     try {
-                        raw = encryptionFunction.apply(encryptionCipher, raw.flip());
+                        raw = encryptionFunction.apply(encryptionCipher, (ByteBuffer) raw.flip());
                     } catch (GeneralSecurityException e) {
                         throw new IllegalStateException("An exception occurred whilst encrypting data!", e);
                     }

@@ -320,7 +320,7 @@ public final class Packet {
      * @return The {@link Packet} to allow for chained writes.
      */
     public Packet putString(String s, Charset charset, ByteOrder order) {
-        var bytes = s.getBytes(charset);
+        byte[] bytes = s.getBytes(charset);
         putShort(bytes.length, order);
         putBytes(bytes);
         return this;

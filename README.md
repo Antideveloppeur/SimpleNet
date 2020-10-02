@@ -1,4 +1,4 @@
-<img src="https://maven-badges.herokuapp.com/maven-central/com.github.jhg023/SimpleNet/badge.svg"> <img src="http://githubbadges.com/star.svg?user=jhg023&repo=SimpleNet&background=0000ff&color=ffffff&style=flat">
+<img src="https://maven-badges.herokuapp.com/maven-central/com.github.antideveloppeur/SimpleNet/badge.svg"> <img src="http://githubbadges.com/star.svg?user=Antideveloppeur&repo=SimpleNet&background=0000ff&color=ffffff&style=flat">
 
 # What is SimpleNet?
 SimpleNet is a simplistic, client-server framework written in Java. One or more `Client` objects can connect to a `Server` and send data back-and-forth via TCP. Most methods that read data from the network are non-blocking and are invoked asynchronously when the requested data arrives. Not having to block a thread and wait for data is what makes SimpleNet scalable for different types of applications such as chat servers, multiplayer game servers, and so much more!
@@ -9,25 +9,18 @@ Maven:
 
 ```xml
 <dependency>
-    <groupId>com.github.jhg023</groupId>
+    <groupId>com.github.antideveloppeur</groupId>
     <artifactId>SimpleNet</artifactId>
-    <version>1.6.6</version>
+    <version>1.6.6-j8</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation 'com.github.jhg023:SimpleNet:1.6.6'
+implementation 'com.github.antideveloppeur:SimpleNet:1.6.6-j8'
 ```
 
- 2. Because SimpleNet is compiled with Java 11, you must first require its module in your `module-info.java`:
-
-```java
-module my.project {
-    requires com.github.simplenet;
-}
-```
 # What do I need to know before using SimpleNet?
 - As stated above, SimpleNet is mostly callback-based. This means that you can request a specific amount of bytes, `n`, and specify what should be done with those `n` bytes, as if the `Client` or `Server` has already received them.
 ```java
@@ -58,7 +51,7 @@ client.flush();
 # Client Example
 ```java
 // Instantiate a new client.
-var client = new Client();
+Client client = new Client();
 
 // Register a connection listener.
 client.onConnect(() -> {
@@ -80,7 +73,7 @@ client.connect("localhost", 43594);
 # Server Example
 ```java
 // Instantiate a new server.
-var server = new Server();
+Server server = new Server();
 
 // Register one connection listener.
 server.onConnect(client -> {
@@ -119,10 +112,10 @@ server.bind("localhost", 43594);
 public class ChatServer {
     public static void main(String[] args) {
         // Initialize a new server.
-        var server = new Server();
+        Server server = new Server();
         
         // Create a map that will keep track of nicknames on our chat server.
-        var nicknameMap = new ConcurrentHashMap<Client, String>();
+        ConcurrentHashMap<Client, String> nicknameMap = new ConcurrentHashMap<>();
         
         // This callback is invoked when a client connects to this server.
         server.onConnect(client -> {
@@ -155,11 +148,11 @@ public class ChatServer {
 public class ChatClient {
     public static void main(String[] args) {
         // Initialize a new client.
-        var client = new Client();
+        Client client = new Client();
         
         // This callback is invoked when this client connects to a server.
         client.onConnect(() -> {
-            var scanner = new Scanner(System.in);
+            Scanner scanner = new Scanner(System.in);
             
             // If messages arrive from other clients, print them to the console.
             client.readStringAlways(System.out::println);
@@ -172,7 +165,7 @@ public class ChatClient {
                 System.out.print("> ");
                 
                 // Read the client's message from the console.
-                var message = scanner.nextLine();
+                String message = scanner.nextLine();
                 
                 // If this client types "/leave", close their connection to the server.
                 if ("/leave".equals(message)) {
@@ -199,7 +192,5 @@ public class ChatClient {
 - I have large packets that exceed the default buffer size; what can I do to avoid an exception?
   - Ideally, the best option would be to split your single, large packet into multiple, small packets. 
   - If splitting the packet is not possible for any reason, both `Client` and `Server` have an overloaded constructor that accepts a buffer size in bytes. You can simply specify a size larger than 8192 (the default size).
-- Will Java 8 ever be supported again?
-  - No, as Java 8 is no longer supported commercially as of January, 2019. SimpleNet will do its best to keep up with LTS releases. However, you're free to clone the project and build it on an older version of Java, as not many code changes are required.
 - What's next for SimpleNet?
   - Once Project Loom is complete and integrated into the mainline JDK, SimpleNet will be rewritten entirely; blocking I/O will be using fibers at that point, which will be much more scalable than my current implementation that uses a fixed thread pool.
