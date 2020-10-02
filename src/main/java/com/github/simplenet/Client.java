@@ -23,8 +23,8 @@
  */
 package com.github.simplenet;
 
-import com.github.antideveloppeur.pbbl.AbstractBufferPool;
-import com.github.antideveloppeur.pbbl.direct.DirectByteBufferPool;
+import com.github.pbbl.AbstractBufferPool;
+import com.github.pbbl.direct.DirectByteBufferPool;
 import com.github.simplenet.packet.Packet;
 import com.github.simplenet.utility.IntPair;
 import com.github.simplenet.utility.MutableBoolean;
